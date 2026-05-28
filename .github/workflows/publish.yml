@@ -1,0 +1,230 @@
+name: Publish Packages
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  # ── APT Repository (hosted on gh-pages) ──────────────────────────────────
+  publish-apt:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install reprepro
+        run: sudo apt-get install -y reprepro gnupg
+
+      - name: Import GPG signing key
+        run: |
+          echo "${{ secrets.APT_GPG_PRIVATE_KEY }}" | gpg --batch --import
+          echo "${{ secrets.APT_GPG_PRIVATE_KEY }}" | gpg --batch --import --passphrase "${{ secrets.APT_GPG_PASSPHRASE }}" || true
+
+      - name: Download .deb from release
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          VERSION_NUM="${VERSION#v}"
+          gh release download "$VERSION" \
+            --pattern "*.deb" \
+            --dir /tmp/debs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Add .deb to reprepro
+        run: |
+          mkdir -p apt/conf
+          cat > apt/conf/distributions << 'EOF'
+          Origin: GuardPost
+          Label: GuardPost
+          Codename: stable
+          Architectures: amd64 arm64
+          Components: main
+          Description: GuardPost APT Repository
+          SignWith: default
+          EOF
+
+          for deb in /tmp/debs/*.deb; do
+            reprepro -b apt includedeb stable "$deb"
+          done
+
+      - name: Update GPG public key
+        run: |
+          gpg --armor --export > apt/gpg.key
+
+      - name: Update install instructions
+        run: |
+          cat > apt/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head><title>GuardPost APT Repository</title></head>
+          <body>
+          <h1>GuardPost APT Repository</h1>
+          <pre>
+          curl -fsSL https://chojuninengu.github.io/guardpost/gpg.key | sudo apt-key add -
+          echo "deb https://chojuninengu.github.io/guardpost/apt stable main" | sudo tee /etc/apt/sources.list.d/guardpost.list
+          sudo apt update && sudo apt install guardpost
+          </pre>
+          </body>
+          </html>
+          EOF
+
+      - name: Commit and push to gh-pages
+        run: |
+          git config user.name "GuardPost Bot"
+          git config user.email "bot@guardpost"
+          git add -A
+          git commit -m "chore: publish ${{ github.event.release.tag_name }} to APT repo" || echo "No changes"
+          git push
+
+  # ── Homebrew Tap ─────────────────────────────────────────────────────────
+  publish-homebrew:
+    runs-on: macos-latest
+    steps:
+      - name: Download macOS .dmg from release
+        run: |
+          VERSION="${{ github.event.release.tag_name }}"
+          gh release download "$VERSION" \
+            --pattern "*.dmg" \
+            --dir /tmp/dmgs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute SHA256
+        id: sha
+        run: |
+          SHA=$(shasum -a 256 /tmp/dmgs/*.dmg | awk '{print $1}')
+          echo "sha256=$SHA" >> $GITHUB_OUTPUT
+          echo "dmg_name=$(ls /tmp/dmgs/*.dmg | xargs basename)" >> $GITHUB_OUTPUT
+
+      - name: Update Homebrew tap
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          script: |
+            const version = '${{ github.event.release.tag_name }}'.replace(/^v/, '');
+            const sha256  = '${{ steps.sha.outputs.sha256 }}';
+            const dmgName = '${{ steps.sha.outputs.dmg_name }}';
+            const owner   = context.repo.owner;
+
+            const formulaContent = `
+            cask "guardpost" do
+              version "${version}"
+              sha256 "${sha256}"
+
+              url "https://github.com/${owner}/guardpost/releases/download/v${version}/${dmgName}"
+              name "GuardPost"
+              desc "Wazuh security agent installer with guided setup wizard"
+              homepage "https://github.com/${owner}/guardpost"
+
+              app "GuardPost.app"
+
+              zap trash: [
+                "~/Library/Application Support/com.adorsys-gis.guardpost",
+                "~/Library/Preferences/com.adorsys-gis.guardpost.plist",
+              ]
+            end
+            `.trim();
+
+            // Update the formula in the homebrew-guardpost tap repo
+            let sha;
+            try {
+              const { data } = await github.rest.repos.getContent({
+                owner,
+                repo: 'homebrew-guardpost',
+                path: 'Casks/guardpost.rb',
+              });
+              sha = data.sha;
+            } catch {
+              sha = undefined;
+            }
+
+            await github.rest.repos.createOrUpdateFileContents({
+              owner,
+              repo: 'homebrew-guardpost',
+              path: 'Casks/guardpost.rb',
+              message: `chore: update guardpost to v${version}`,
+              content: Buffer.from(formulaContent).toString('base64'),
+              ...(sha ? { sha } : {}),
+            });
+
+  # ── Chocolatey ───────────────────────────────────────────────────────────
+  publish-choco:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows installer
+        run: |
+          $version = "${{ github.event.release.tag_name }}"
+          gh release download $version --pattern "*.exe" --dir C:\tmp\exe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
+
+      - name: Compute SHA256
+        id: sha
+        run: |
+          $hash = (Get-FileHash C:\tmp\exe\*.exe -Algorithm SHA256).Hash.ToLower()
+          $name = (Get-ChildItem C:\tmp\exe\*.exe).Name
+          echo "sha256=$hash" >> $env:GITHUB_OUTPUT
+          echo "exe_name=$name" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: Build Chocolatey package
+        run: |
+          $version = "${{ github.event.release.tag_name }}".TrimStart('v')
+          $sha256  = "${{ steps.sha.outputs.sha256 }}"
+          $exeName = "${{ steps.sha.outputs.exe_name }}"
+          $owner   = "${{ github.repository_owner }}"
+
+          New-Item -ItemType Directory -Force -Path choco\tools | Out-Null
+
+          @"
+          <?xml version="1.0" encoding="utf-8"?>
+          <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+            <metadata>
+              <id>guardpost</id>
+              <version>$version</version>
+              <title>GuardPost</title>
+              <authors>ADORSYS-GIS</authors>
+              <projectUrl>https://github.com/$owner/guardpost</projectUrl>
+              <description>GuardPost installs and enrolls the Wazuh security agent with a friendly guided UI.</description>
+              <tags>wazuh security agent siem xdr guardpost</tags>
+            </metadata>
+          </package>
+          "@ | Out-File -Encoding UTF8 choco\guardpost.nuspec
+
+          @"
+          `$ErrorActionPreference = 'Stop'
+          `$packageName = 'guardpost'
+          `$installerType = 'exe'
+          `$url64 = 'https://github.com/$owner/guardpost/releases/download/v$version/$exeName'
+          `$checksum64 = '$sha256'
+          `$checksumType64 = 'sha256'
+          `$silentArgs = '/S'
+
+          Install-ChocolateyPackage ``
+            -PackageName `$packageName ``
+            -FileType `$installerType ``
+            -SilentArgs `$silentArgs ``
+            -Url64bit `$url64 ``
+            -Checksum64 `$checksum64 ``
+            -ChecksumType64 `$checksumType64
+          "@ | Out-File -Encoding UTF8 choco\tools\chocolateyInstall.ps1
+
+          choco pack choco\guardpost.nuspec --output-directory choco\out
+        shell: pwsh
+
+      - name: Push to Chocolatey Community Repository
+        run: |
+          choco apikey --key ${{ secrets.CHOCO_API_KEY }} --source https://push.chocolatey.org/
+          choco push choco\out\*.nupkg --source https://push.chocolatey.org/
+        shell: pwsh
