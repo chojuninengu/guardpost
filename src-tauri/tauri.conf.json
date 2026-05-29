@@ -10,7 +10,6 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "withGlobalTauri": true,
     "windows": [
       {
         "title": "GuardPost",
@@ -44,7 +43,7 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "scripts/*": "scripts/"
+      "../scripts/*": "scripts/"
     },
     "linux": {
       "deb": {
@@ -62,29 +61,7 @@
   },
   "plugins": {
     "shell": {
-      "open": true,
-      "scope": [
-        {
-          "name": "run-setup-unix",
-          "cmd": "bash",
-          "args": true
-        },
-        {
-          "name": "run-setup-windows",
-          "cmd": "powershell",
-          "args": true
-        },
-        {
-          "name": "pkexec",
-          "cmd": "pkexec",
-          "args": true
-        },
-        {
-          "name": "sudo",
-          "cmd": "sudo",
-          "args": true
-        }
-      ]
+      "open": true
     }
   }
 }
