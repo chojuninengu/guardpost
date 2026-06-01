@@ -374,39 +374,52 @@ async fn run_oauth_enrollment(
     endpoint: String,
 ) -> Result<(), String> {
     use std::process::Stdio;
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt};
+    use tokio::io::AsyncBufReadExt;
 
     let _ = app.emit("oauth-output", format!("🔍 Using: {}\n", OAUTH2_BIN));
     let _ = app.emit("oauth-output", format!("🌐 Issuer: {}\n", issuer));
     let _ = app.emit("oauth-output", format!("🔗 Endpoint: {}\n\n", endpoint));
 
-    let is_root = unsafe { libc::geteuid() == 0 };
+    #[cfg(unix)]
+    let mut child = {
+        use tokio::io::AsyncWriteExt;
 
-    // Build: sudo -S /var/ossec/bin/wazuh-cert-oauth2-client o-auth2 --issuer ... --endpoint ...
-    let mut cmd = tokio::process::Command::new("sudo");
-    if !is_root {
-        cmd.arg("-S");
-    }
-    cmd.arg(OAUTH2_BIN)
+        let is_root = unsafe { libc::geteuid() == 0 };
+        let mut cmd = tokio::process::Command::new("sudo");
+        if !is_root {
+            cmd.arg("-S");
+        }
+        cmd.arg(OAUTH2_BIN)
+            .arg("o-auth2")
+            .arg("--issuer").arg(&issuer)
+            .arg("--endpoint").arg(&endpoint)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
+
+        let mut child = cmd
+            .spawn()
+            .map_err(|e| format!("Failed to start OAuth2 enrollment: {}", e))?;
+
+        if !is_root {
+            if let Some(mut stdin) = child.stdin.take() {
+                let pass = state.sudo_password.lock().unwrap().clone().unwrap_or_default();
+                let _ = stdin.write_all(format!("{}\n", pass).as_bytes()).await;
+                let _ = stdin.flush().await;
+            }
+        }
+        child
+    };
+
+    #[cfg(windows)]
+    let mut child = tokio::process::Command::new(OAUTH2_BIN)
         .arg("o-auth2")
         .arg("--issuer").arg(&issuer)
         .arg("--endpoint").arg(&endpoint)
-        .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    let mut child = cmd
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("Failed to start OAuth2 enrollment: {}", e))?;
-
-    // Pipe sudo password if needed
-    if !is_root {
-        if let Some(mut stdin) = child.stdin.take() {
-            let pass = state.sudo_password.lock().unwrap().clone().unwrap_or_default();
-            let _ = stdin.write_all(format!("{}\n", pass).as_bytes()).await;
-            let _ = stdin.flush().await;
-        }
-    }
 
     let _ = app.emit("oauth-output", "🔄 Opening browser for authentication...\n");
 
@@ -455,7 +468,7 @@ async fn run_oauth_enrollment(
 
 async fn run_script_with_streaming(
     app: &AppHandle,
-    state: &State<'_, AppState>,
+    #[cfg(unix)] state: &State<'_, AppState>,
     script_path: &str,
     wazuh_manager: &str,
     ids_engine: &str,
@@ -464,7 +477,7 @@ async fn run_script_with_streaming(
     version_overrides: Option<&AdminConfig>,
 ) -> Result<(), String> {
     use std::process::Stdio;
-    use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+    use tokio::io::{AsyncBufReadExt, BufReader};
 
     #[cfg(target_os = "windows")]
     let (cmd, args) = build_windows_command(script_path, wazuh_manager, ids_engine, suricata_mode, install_trivy);
@@ -513,6 +526,7 @@ async fn run_script_with_streaming(
 
     #[cfg(not(target_os = "windows"))]
     {
+        use tokio::io::AsyncWriteExt;
         let is_root = unsafe { libc::geteuid() == 0 };
         if !is_root {
             if let Some(mut stdin) = child.stdin.take() {
