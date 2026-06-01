@@ -28,14 +28,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+          cache: npm
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -60,8 +57,8 @@ jobs:
         shell: bash
         run: bash scripts/fetch-scripts.sh
 
-      - name: Install frontend deps
-        run: pnpm install
+      - name: Install frontend dependencies
+        run: npm ci
 
       - name: Build Tauri app
-        run: pnpm tauri build
+        run: npx tauri build
