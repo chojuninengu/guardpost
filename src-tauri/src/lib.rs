@@ -369,7 +369,7 @@ const OAUTH2_BIN: &str = "/var/ossec/bin/wazuh-cert-oauth2-client";
 #[tauri::command]
 async fn run_oauth_enrollment(
     app: AppHandle,
-    state: State<'_, AppState>,
+    #[allow(unused_variables)] state: State<'_, AppState>,
     issuer: String,
     endpoint: String,
 ) -> Result<(), String> {
@@ -468,7 +468,7 @@ async fn run_oauth_enrollment(
 
 async fn run_script_with_streaming(
     app: &AppHandle,
-    #[cfg(unix)] state: &State<'_, AppState>,
+    #[allow(unused_variables)] state: &State<'_, AppState>,
     script_path: &str,
     wazuh_manager: &str,
     ids_engine: &str,
@@ -607,35 +607,40 @@ fn build_unix_command(
 
 #[cfg(target_os = "windows")]
 fn build_windows_command(
-    script_path: &str,
+    _script_path: &str,
     _wazuh_manager: &str,
     ids_engine: &str,
     suricata_mode: Option<&str>,
     install_trivy: bool,
 ) -> (String, Vec<String>) {
-    let mut ps_args = format!(
-        "-ExecutionPolicy Bypass -NoProfile -File \"{}\"",
-        script_path
+    let mut ps_script = format!(
+        "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ADORSYS-GIS/wazuh-agent/refs/heads/develop/scripts/setup-agent.ps1' -UseBasicParsing -OutFile \"$env:TEMP\\setup-agent.ps1\"; & \"$env:TEMP\\setup-agent.ps1\""
     );
 
     match ids_engine {
         "suricata" => {
             let mode = suricata_mode.unwrap_or("ids");
-            ps_args.push_str(&format!(" -SuricataMode {}", mode));
+            ps_script.push_str(&format!(" -SuricataMode {}", mode));
         }
         "snort" => {
-            ps_args.push_str(" -InstallSnort");
+            ps_script.push_str(" -InstallSnort");
         }
         _ => {}
     }
 
     if install_trivy {
-        ps_args.push_str(" -InstallTrivy");
+        ps_script.push_str(" -InstallTrivy");
     }
 
     (
         "powershell.exe".to_string(),
-        vec![ps_args],
+        vec![
+            "-ExecutionPolicy".to_string(),
+            "Bypass".to_string(),
+            "-NoProfile".to_string(),
+            "-Command".to_string(),
+            ps_script,
+        ],
     )
 }
 
