@@ -364,7 +364,12 @@ async fn run_install(
 
 // ─── OAuth2 Enrollment ────────────────────────────────────────────────────────
 
+#[cfg(target_os = "linux")]
 const OAUTH2_BIN: &str = "/var/ossec/bin/wazuh-cert-oauth2-client";
+#[cfg(target_os = "macos")]
+const OAUTH2_BIN: &str = "/Library/Ossec/bin/wazuh-cert-oauth2-client";
+#[cfg(target_os = "windows")]
+const OAUTH2_BIN: &str = r"C:\Program Files (x86)\ossec-agent\wazuh-cert-oauth2-client.exe";
 
 #[tauri::command]
 async fn run_oauth_enrollment(
