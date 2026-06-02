@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPTS_DIR="$(cd "$(dirname "$0")/../scripts" && pwd)"
 mkdir -p "$SCRIPTS_DIR"
 
-BASE="https://raw.githubusercontent.com/ADORSYS-GIS/wazuh-agent/refs/heads/develop/scripts"
+BASE="https://raw.githubusercontent.com/ADORSYS-GIS/wazuh-agent/refs/heads/main/scripts"
 
 echo "📥 Fetching Unix setup script (Linux/macOS)..."
 curl -fsSL "$BASE/setup-agent.sh" -o "$SCRIPTS_DIR/setup-agent.sh"

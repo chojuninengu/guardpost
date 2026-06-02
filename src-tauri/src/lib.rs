@@ -497,7 +497,7 @@ async fn run_script_with_streaming(
     // All sub-repos (cert-oauth2, yara, snort, suricata, trivy, agent-status)
     // use the same refactor branch during development.  Admin can override
     // individual repos via AdminConfig fields.
-    let default_ref = "develop";
+    let default_ref = "main";
     let repo_ref = version_overrides
         .and_then(|ov| ov.wazuh_agent_repo_ref.clone())
         .unwrap_or_else(|| default_ref.to_string());
@@ -603,7 +603,7 @@ fn build_unix_command(
     let sudo_prefix = if is_root { "" } else { "sudo -S " };
 
     let bash_command = format!(
-        "curl -fsSL https://raw.githubusercontent.com/ADORSYS-GIS/wazuh-agent/develop/scripts/setup-agent.sh -o /tmp/setup-agent.sh && chmod +x /tmp/setup-agent.sh && {}env WAZUH_AGENT_REPO_REF='develop' WAZUH_MANAGER='{}' bash /tmp/setup-agent.sh{}",
+        "curl -fsSL https://raw.githubusercontent.com/ADORSYS-GIS/wazuh-agent/main/scripts/setup-agent.sh -o /tmp/setup-agent.sh && chmod +x /tmp/setup-agent.sh && {}env WAZUH_AGENT_REPO_REF='main' WAZUH_MANAGER='{}' bash /tmp/setup-agent.sh{}",
         sudo_prefix, wazuh_manager, script_args
     );
 
@@ -619,7 +619,7 @@ fn build_windows_command(
     install_trivy: bool,
 ) -> (String, Vec<String>) {
     let mut ps_script = format!(
-        "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ADORSYS-GIS/wazuh-agent/refs/heads/develop/scripts/setup-agent.ps1' -UseBasicParsing -OutFile \"$env:TEMP\\setup-agent.ps1\"; & \"$env:TEMP\\setup-agent.ps1\""
+        "Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ADORSYS-GIS/wazuh-agent/refs/heads/main/scripts/setup-agent.ps1' -UseBasicParsing -OutFile \"$env:TEMP\\setup-agent.ps1\"; & \"$env:TEMP\\setup-agent.ps1\""
     );
 
     match ids_engine {
