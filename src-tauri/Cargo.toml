@@ -1,6 +1,6 @@
 [package]
 name = "guardpost"
-version = "0.1.0"
+version = "1.0.1"
 description = "GuardPost — Wazuh Agent Installer"
 authors = ["ADORSYS-GIS"]
 license = "MIT"
