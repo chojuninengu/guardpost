@@ -101,7 +101,11 @@ fn get_script_path(app: AppHandle) -> Result<String, String> {
 
 /// Check which Wazuh components are installed on this system
 #[tauri::command]
-fn check_components() -> Vec<ComponentStatus> {
+fn check_components(
+    #[allow(unused_variables)] state: tauri::State<'_, AppState>
+) -> Vec<ComponentStatus> {
+    let password = state.sudo_password.lock().unwrap().clone();
+
     fn try_version(path: &str) -> Option<String> {
         for flag in &["--version", "-V", "-v"] {
             if let Ok(out) = std::process::Command::new(path)
@@ -120,33 +124,82 @@ fn check_components() -> Vec<ComponentStatus> {
         None
     }
 
-    fn file_exists_sudo(path: &str) -> bool {
-        std::process::Command::new("sudo")
-            .args(["-n", "test", "-f", path])
+    fn file_exists_sudo(path: &str, password: &Option<String>) -> bool {
+        let is_root = unsafe { libc::geteuid() == 0 };
+        if is_root {
+            return std::path::Path::new(path).exists();
+        }
+
+        let mut cmd = std::process::Command::new("sudo");
+        
+        if let Some(pwd) = password {
+            use std::io::Write;
+            let mut child = cmd.args(["-S", "-p", "", "test", "-f", path])
+                .stdin(std::process::Stdio::piped())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .ok();
+                
+            if let Some(mut child) = child {
+                if let Some(mut stdin) = child.stdin.take() {
+                    let _ = stdin.write_all(format!("{}\n", pwd).as_bytes());
+                }
+                return child.wait().map_or(false, |status| status.success());
+            }
+            return false;
+        }
+
+        cmd.args(["-n", "test", "-f", path])
             .output()
             .ok()
             .map_or(false, |o| o.status.success())
     }
 
-    fn binary_ver(paths: &[&str]) -> (bool, Option<String>, String) {
+    fn binary_ver(paths: &[&str], password: &Option<String>) -> (bool, Option<String>, String) {
         for p in paths {
             if std::path::Path::new(p).exists() {
                 let ver = try_version(p);
                 return (true, ver, p.to_string());
             }
-            // If direct access fails, try via sudo -n (uses cached credentials)
-            if file_exists_sudo(p) {
-                let ver = std::process::Command::new("sudo")
-                    .args(["-n", p, "--version"])
-                    .output()
-                    .ok()
-                    .and_then(|o| {
-                        String::from_utf8(o.stdout).ok()
-                            .or_else(|| String::from_utf8(o.stderr).ok())
-                    })
-                    .and_then(|s| s.lines().next().map(|l| l.to_string()))
-                    .filter(|s| !s.is_empty());
-                return (true, ver, p.to_string());
+            // If direct access fails, try via sudo using password (or -n if no password)
+            if file_exists_sudo(p, password) {
+                let mut cmd = std::process::Command::new("sudo");
+                if let Some(pwd) = password {
+                    use std::io::Write;
+                    let mut child = cmd.args(["-S", "-p", "", p, "--version"])
+                        .stdin(std::process::Stdio::piped())
+                        .stdout(std::process::Stdio::piped())
+                        .stderr(std::process::Stdio::piped())
+                        .spawn()
+                        .ok();
+                    
+                    if let Some(mut child) = child {
+                        if let Some(mut stdin) = child.stdin.take() {
+                            let _ = stdin.write_all(format!("{}\n", pwd).as_bytes());
+                        }
+                        let output = child.wait_with_output().ok();
+                        let ver = output.and_then(|o| {
+                            String::from_utf8(o.stdout).ok()
+                                .or_else(|| String::from_utf8(o.stderr).ok())
+                        })
+                        .and_then(|s| s.lines().next().map(|l| l.to_string()))
+                        .filter(|s| !s.is_empty());
+                        return (true, ver, p.to_string());
+                    }
+                } else {
+                    let ver = cmd.args(["-n", p, "--version"])
+                        .output()
+                        .ok()
+                        .and_then(|o| {
+                            String::from_utf8(o.stdout).ok()
+                                .or_else(|| String::from_utf8(o.stderr).ok())
+                        })
+                        .and_then(|s| s.lines().next().map(|l| l.to_string()))
+                        .filter(|s| !s.is_empty());
+                    return (true, ver, p.to_string());
+                }
+                return (true, None, p.to_string());
             }
         }
         (false, None, paths[0].to_string())
@@ -185,7 +238,7 @@ fn check_components() -> Vec<ComponentStatus> {
     let agent_paths = &["/Library/Ossec/bin/wazuh-agent", "/Library/Ossec/bin/wazuh-agentd", "/Library/Ossec/bin/wazuh-control"][..];
     #[cfg(target_os = "windows")]
     let agent_paths = &[r"C:\Program Files (x86)\ossec-agent\wazuh-agent.exe"][..];
-    let (mut installed, ver, mut found_path) = binary_ver(agent_paths);
+    let (mut installed, ver, mut found_path) = binary_ver(agent_paths, &password);
     if !installed {
         let running = process_running("wazuh-agentd") || service_active("wazuh-agent");
         if running {
@@ -202,7 +255,7 @@ fn check_components() -> Vec<ComponentStatus> {
     let oauth_paths = &["/Library/Ossec/bin/wazuh-cert-oauth2-client"][..];
     #[cfg(target_os = "windows")]
     let oauth_paths = &[r"C:\Program Files (x86)\ossec-agent\wazuh-cert-oauth2-client.exe"][..];
-    let (installed, ver, found_path) = binary_ver(oauth_paths);
+    let (installed, ver, found_path) = binary_ver(oauth_paths, &password);
     components.push(ComponentStatus { name: "OAuth2 Client", installed, version: ver, path: found_path });
 
     // Yara
@@ -235,7 +288,7 @@ fn check_components() -> Vec<ComponentStatus> {
     let usb_paths = &["/Library/Ossec/active-response/bin/disable-usb-storage-macos.sh"][..];
     #[cfg(target_os = "windows")]
     let usb_paths = &[r"C:\Program Files (x86)\ossec-agent\active-response\bin\disable-usb-storage.ps1"][..];
-    let (installed, ver, found_path) = binary_ver(usb_paths);
+    let (installed, ver, found_path) = binary_ver(usb_paths, &password);
     components.push(ComponentStatus {
         name: "USB DLP Scripts",
         installed,
