@@ -146,6 +146,7 @@ export default function App() {
         invoke("run_oauth_enrollment", {
           issuer: issuerRef.current,
           endpoint: endpointRef.current,
+          password: sudoPassword || null
         }).catch((e: unknown) => {
           setEnrollLogs((prev) => [...prev, `❌ ${String(e)}\n`]);
           setEnrollRunning(false);
@@ -332,7 +333,11 @@ export default function App() {
               setEnrollDone(false);
               setEnrollRunning(true);
               try {
-                await invoke("run_oauth_enrollment", { issuer: oauthIssuer, endpoint: oauthEndpoint });
+                await invoke("run_oauth_enrollment", {
+                  issuer: oauthIssuer,
+                  endpoint: oauthEndpoint,
+                  password: sudoPassword || null
+                });
               } catch (e: unknown) {
                 setEnrollLogs((prev) => [...prev, `❌ ${String(e)}\n`]);
                 setEnrollRunning(false);

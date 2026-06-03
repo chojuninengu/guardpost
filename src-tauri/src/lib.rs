@@ -377,7 +377,11 @@ async fn run_oauth_enrollment(
     #[allow(unused_variables)] state: State<'_, AppState>,
     issuer: String,
     endpoint: String,
+    password: Option<String>,
 ) -> Result<(), String> {
+    if let Some(p) = password {
+        *state.sudo_password.lock().unwrap() = Some(p);
+    }
     use std::process::Stdio;
     use tokio::io::AsyncBufReadExt;
 
