@@ -8,8 +8,10 @@ src-tauri/target/
 src-tauri/gen/
 
 # Bundled scripts (fetched at build time)
-scripts/setup-agent.sh
+scripts/setup-agent-linux.sh
+scripts/setup-agent-macos.sh
 scripts/setup-agent.ps1
+scripts/utils.sh
 
 # OS
 .DS_Store

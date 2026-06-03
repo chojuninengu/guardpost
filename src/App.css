@@ -1,36 +1,81 @@
 /* ── Layout ─────────────────────────────────────────────────────────────── */
 
-.app {
+.app-layout {
   display: flex;
-  flex-direction: column;
   height: 100vh;
   width: 100vw;
   background: var(--bg);
   overflow: hidden;
 }
 
-.app-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 24px;
-  border-bottom: 1px solid var(--border);
+.sidebar {
+  width: 240px;
   background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
   flex-shrink: 0;
 }
 
-.header-left {
+.sidebar-header {
   display: flex;
   align-items: center;
   gap: 10px;
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
 }
 
 .app-name {
   font-family: var(--sans);
   font-weight: 800;
-  font-size: 15px;
+  font-size: 16px;
   letter-spacing: 0.04em;
   color: var(--text);
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 16px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: transparent;
+  border: none;
+  color: var(--text-2);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.nav-item:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.nav-item.active {
+  background: rgba(0, 229, 160, 0.1);
+  color: var(--accent);
+}
+
+.nav-icon {
+  font-size: 16px;
+}
+
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid var(--border);
+  text-align: center;
 }
 
 .platform-badge {
@@ -40,14 +85,23 @@
   color: var(--text-2);
   background: var(--surface-2);
   border: 1px solid var(--border);
-  padding: 3px 8px;
+  padding: 4px 8px;
   border-radius: 4px;
+  display: inline-block;
 }
 
-.app-main {
+.main-content {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
-  padding: 0 24px 24px;
+  position: relative;
+}
+
+.tab-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 /* ── Step Indicator ─────────────────────────────────────────────────────── */
@@ -130,9 +184,10 @@
 /* ── Screens ────────────────────────────────────────────────────────────── */
 
 .screen {
-  max-width: 600px;
+  max-width: 640px;
   margin: 0 auto;
-  padding-top: 28px;
+  padding: 40px 24px;
+  width: 100%;
 }
 
 /* ── Welcome ────────────────────────────────────────────────────────────── */
@@ -650,4 +705,275 @@
   font-size: 11px;
   color: var(--text-3);
   line-height: 1.5;
+}
+
+/* ── Enrolling ────────────────────────────────────────────────────────── */
+
+.enrolling-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.enrolling-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.spinner--done {
+  border-color: var(--accent);
+  animation: none;
+}
+
+.enrolling-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.enrolling-sub {
+  font-size: 12px;
+  color: var(--text-2);
+  margin-top: 2px;
+}
+
+.enrolling-log-box {
+  height: 220px;
+}
+
+/* ── Landing Cards ─────────────────────────────────────────────────────── */
+
+.landing-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  z-index: 1;
+}
+
+.landing-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.landing-card:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+
+.landing-card:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.landing-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.landing-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.landing-card-desc {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+/* ── Config Actions ────────────────────────────────────────────────────── */
+
+.config-top,
+.check-header,
+.admin-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.config-actions,
+.admin-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.config-actions .btn-primary,
+.admin-actions .btn-primary {
+  flex: 1;
+}
+
+.config-actions .btn-secondary,
+.admin-actions .btn-secondary {
+  flex-shrink: 0;
+}
+
+.btn-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 20px;
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s;
+  white-space: nowrap;
+}
+
+.btn-secondary:hover {
+  background: var(--surface-2);
+  border-color: var(--border-hi);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 0;
+  transition: opacity 0.2s;
+}
+
+.btn-ghost:hover {
+  opacity: 0.8;
+}
+
+/* ── Check Components ──────────────────────────────────────────────────── */
+
+.check-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.check-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.check-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  gap: 12px;
+}
+
+.check-card--ok {
+  border-left: 3px solid var(--accent);
+}
+
+.check-card--missing {
+  border-left: 3px solid var(--text-3);
+  opacity: 0.65;
+}
+
+.check-card-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.check-card-left > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.check-card-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.check-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.check-card-ver {
+  font-size: 11px;
+  color: var(--accent);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check-card-path {
+  font-size: 10px;
+  color: var(--text-3);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.check-badge {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.check-badge--ok {
+  background: rgba(0, 229, 160, 0.12);
+  color: var(--accent);
+  border: 1px solid rgba(0, 229, 160, 0.25);
+}
+
+.check-badge--missing {
+  background: var(--surface-2);
+  color: var(--text-3);
+  border: 1px solid var(--border);
+}
+
+/* ── Admin Settings ────────────────────────────────────────────────────── */
+
+.admin-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-fields .field-input {
+  font-family: var(--mono);
+  font-size: 12px;
 }

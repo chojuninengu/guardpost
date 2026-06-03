@@ -1,16 +1,15 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "GuardPost",
-  "version": "0.1.0",
+  "version": "1.0.2",
   "identifier": "com.adorsys-gis.guardpost",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "bash scripts/fetch-scripts.sh && npm run build"
   },
   "app": {
-    "withGlobalTauri": true,
     "windows": [
       {
         "title": "GuardPost",
@@ -44,7 +43,7 @@
       "icons/icon.ico"
     ],
     "resources": {
-      "scripts/*": "scripts/"
+      "../scripts/*": "scripts/"
     },
     "linux": {
       "deb": {
@@ -62,29 +61,7 @@
   },
   "plugins": {
     "shell": {
-      "open": true,
-      "scope": [
-        {
-          "name": "run-setup-unix",
-          "cmd": "bash",
-          "args": true
-        },
-        {
-          "name": "run-setup-windows",
-          "cmd": "powershell",
-          "args": true
-        },
-        {
-          "name": "pkexec",
-          "cmd": "pkexec",
-          "args": true
-        },
-        {
-          "name": "sudo",
-          "cmd": "sudo",
-          "args": true
-        }
-      ]
+      "open": true
     }
   }
 }
