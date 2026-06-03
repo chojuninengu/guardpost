@@ -393,6 +393,8 @@ async fn run_oauth_enrollment(
         let mut cmd = tokio::process::Command::new("sudo");
         if !is_root {
             cmd.arg("-S");
+            cmd.arg("-p");
+            cmd.arg("");
         }
         cmd.arg(OAUTH2_BIN)
             .arg("o-auth2")
@@ -600,14 +602,31 @@ fn build_unix_command(
     }
 
     let is_root = unsafe { libc::geteuid() == 0 };
-    let sudo_prefix = if is_root { "" } else { "sudo -S " };
-
+    
+    // We execute the whole chain inside bash -c.
+    // If not root, we wrap the ENTIRE bash execution in sudo -S. 
+    // This ensures sudo immediately reads the piped password on stdin,
+    // avoiding issues on macOS where delayed sudo execution inside a bash 
+    // script might lose the stdin buffer.
     let bash_command = format!(
-        "curl -fsSL https://raw.githubusercontent.com/ADORSYS-GIS/wazuh-agent/main/scripts/setup-agent.sh -o /tmp/setup-agent.sh && chmod +x /tmp/setup-agent.sh && {}env WAZUH_AGENT_REPO_REF='main' WAZUH_MANAGER='{}' bash /tmp/setup-agent.sh{}",
-        sudo_prefix, wazuh_manager, script_args
+        "curl -fsSL https://raw.githubusercontent.com/ADORSYS-GIS/wazuh-agent/main/scripts/setup-agent.sh -o /tmp/setup-agent.sh && chmod +x /tmp/setup-agent.sh && env WAZUH_AGENT_REPO_REF='main' WAZUH_MANAGER='{}' bash /tmp/setup-agent.sh{}",
+        wazuh_manager, script_args
     );
 
-    ("bash".to_string(), vec!["-c".to_string(), bash_command])
+    if is_root {
+        ("bash".to_string(), vec!["-c".to_string(), bash_command])
+    } else {
+        // -k forces sudo to ignore cached credentials and prompt (reading from stdin via -S)
+        // -p '' removes the visual "Password:" prompt from stderr
+        ("sudo".to_string(), vec![
+            "-S".to_string(),
+            "-p".to_string(),
+            "".to_string(),
+            "bash".to_string(),
+            "-c".to_string(),
+            bash_command
+        ])
+    }
 }
 
 #[cfg(target_os = "windows")]
