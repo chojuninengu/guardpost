@@ -242,6 +242,32 @@ fn check_components() -> Vec<ComponentStatus> {
     components
 }
 
+#[tauri::command]
+async fn verify_sudo(password: String) -> Result<bool, String> {
+    use std::process::Stdio;
+    use tokio::io::AsyncWriteExt;
+
+    // sudo -S -k -p "" id -u
+    let mut cmd = tokio::process::Command::new("sudo");
+    cmd.arg("-S")
+        .arg("-k")
+        .arg("-p").arg("")
+        .arg("id").arg("-u")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+
+    let mut child = cmd.spawn().map_err(|e| e.to_string())?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(format!("{}\n", password).as_bytes()).await;
+        let _ = stdin.flush().await;
+    }
+
+    let status = child.wait().await.map_err(|e| e.to_string())?;
+    Ok(status.success())
+}
+
 /// Load saved admin version overrides
 #[tauri::command]
 fn load_admin_config(app: AppHandle) -> AdminConfig {
@@ -757,6 +783,7 @@ pub fn run() {
             check_components,
             load_admin_config,
             save_admin_config,
+            verify_sudo,
             run_install,
             run_oauth_enrollment,
         ])

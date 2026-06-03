@@ -830,6 +830,28 @@ function SudoPromptScreen({ password, setPassword, onSubmit }: {
   setPassword: (s: string) => void;
   onSubmit: () => void;
 }) {
+  const [error, setError] = useState("");
+  const [verifying, setVerifying] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!password) return;
+    setVerifying(true);
+    setError("");
+    try {
+      const ok = await invoke<boolean>("verify_sudo", { password });
+      if (ok) {
+        onSubmit();
+      } else {
+        setError("Incorrect password, please try again.");
+        setPassword("");
+      }
+    } catch (e: unknown) {
+      setError(String(e));
+    } finally {
+      setVerifying(false);
+    }
+  };
+
   return (
     <div className="app-layout" style={{ alignItems: "center", justifyContent: "center", display: "flex" }}>
       <div className="screen config-screen" style={{ animation: "fadeUp 0.4s ease both", maxWidth: "420px" }}>
@@ -841,25 +863,37 @@ function SudoPromptScreen({ password, setPassword, onSubmit }: {
           GuardPost needs administrative privileges to install Wazuh components.
         </p>
 
+        {error && (
+          <div style={{ color: "var(--danger)", textAlign: "center", marginBottom: "12px", fontSize: "14px", background: "var(--danger-bg, rgba(239, 68, 68, 0.1))", padding: "8px", borderRadius: "6px" }}>
+            {error}
+          </div>
+        )}
+
         <div className="field-group" style={{ marginTop: "10px" }}>
           <input
             className="field-input"
             type="password"
             placeholder="Enter your system password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && password && onSubmit()}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setError("");
+            }}
+            onKeyDown={(e) => e.key === "Enter" && password && handleSubmit()}
+            disabled={verifying}
             autoFocus
           />
         </div>
 
         <button 
           className="btn-primary" 
-          onClick={onSubmit} 
-          disabled={!password}
+          onClick={handleSubmit} 
+          disabled={!password || verifying}
           style={{ marginTop: "10px" }}
         >
-          Continue
+          {verifying ? (
+            <><span className="spinner" style={{ width: 14, height: 14, marginRight: 8 }} />Verifying…</>
+          ) : "Continue"}
         </button>
       </div>
     </div>
