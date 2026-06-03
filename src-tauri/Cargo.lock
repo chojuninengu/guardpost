@@ -1431,7 +1431,7 @@ dependencies = [
 
 [[package]]
 name = "guardpost"
-version = "0.1.0"
+version = "1.0.2"
 dependencies = [
  "libc",
  "serde",

@@ -206,8 +206,12 @@ fn check_components() -> Vec<ComponentStatus> {
     components.push(ComponentStatus { name: "OAuth2 Client", installed, version: ver, path: found_path });
 
     // Yara
-    let (installed, ver) = path_ver("yara");
-    components.push(ComponentStatus { name: "Yara", installed, version: ver, path: "yara".to_string() });
+    #[cfg(target_os = "windows")]
+    let yara_bin = "yara64";
+    #[cfg(not(target_os = "windows"))]
+    let yara_bin = "yara";
+    let (installed, ver) = path_ver(yara_bin);
+    components.push(ComponentStatus { name: "Yara", installed, version: ver, path: yara_bin.to_string() });
 
     // Suricata
     let (installed, ver) = path_ver("suricata");
@@ -449,14 +453,18 @@ async fn run_oauth_enrollment(
     };
 
     #[cfg(windows)]
-    let mut child = tokio::process::Command::new(OAUTH2_BIN)
-        .arg("o-auth2")
-        .arg("--issuer").arg(&issuer)
-        .arg("--endpoint").arg(&endpoint)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to start OAuth2 enrollment: {}", e))?;
+    let mut child = {
+        let mut cmd = tokio::process::Command::new(OAUTH2_BIN);
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        cmd.arg("o-auth2")
+            .arg("--issuer").arg(&issuer)
+            .arg("--endpoint").arg(&endpoint)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to start OAuth2 enrollment: {}", e))?
+    };
 
     let _ = app.emit("oauth-output", "🔄 Opening browser for authentication...\n");
 
@@ -522,6 +530,11 @@ async fn run_script_with_streaming(
     let (cmd, args) = build_unix_command(script_path, wazuh_manager, ids_engine, suricata_mode, install_trivy);
 
     let mut child_cmd = tokio::process::Command::new(&cmd);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        child_cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
     child_cmd.args(&args);
     child_cmd.env("WAZUH_MANAGER", wazuh_manager);
 
